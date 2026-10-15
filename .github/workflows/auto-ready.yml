@@ -1,0 +1,39 @@
+name: auto-ready
+
+# CI（check suite）完成后：若该提交对应的 draft PR 所有 checks 都通过，自动转为 ready
+on:
+  check_suite:
+    types: [completed]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  ready-if-green:
+    if: github.event.check_suite.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ready draft PR if all checks passed
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.check_suite.head_sha }}
+        run: |
+          prs=$(gh pr list --state open --json number,isDraft,headRefOid \
+            --jq '.[] | select(.headRefOid == env.HEAD_SHA and .isDraft == true) | .number')
+          if [ -z "$prs" ]; then
+            echo ">>> 该提交没有对应的 draft PR，跳过"
+            exit 0
+          fi
+          for pr in $prs; do
+            # 排除本 workflow 自身（它正在跑，必然是 pending，会把自己卡死）
+            not_green=$(gh pr checks "$pr" --json name,bucket \
+              --jq '[.[] | select(.name != "ready-if-green")
+                     | select(.bucket != "pass" and .bucket != "skipping")] | length')
+            if [ "$not_green" -eq 0 ]; then
+              echo ">>> PR #$pr 全部 checks 通过，自动转为 ready"
+              gh pr ready "$pr"
+            else
+              echo ">>> PR #$pr 还有 $not_green 个未通过/进行中的 checks，暂不 ready"
+            fi
+          done

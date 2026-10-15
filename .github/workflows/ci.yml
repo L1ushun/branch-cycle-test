@@ -1,0 +1,21 @@
+name: ci
+
+# 模拟 CI：往 dev 分支推代码 / 更新 PR 时跑检查
+# 真实项目里换成你们已有的 lint / test / build workflow 即可
+on:
+  push:
+    branches: ['dev-*']
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run checks
+        run: |
+          echo ">>> 模拟 lint..."
+          sleep 5
+          echo ">>> 模拟 test..."
+          sleep 5
+          echo ">>> 全部通过"
