@@ -126,3 +126,4 @@ gh workflow run cycle.yml --repo L1ushun/branch-cycle-test
 - v1.17.0 开发提交
 - v1.18.0 开发提交
 - v1.19.0 开发提交
+- v1.20.0 开发提交
