@@ -23,3 +23,4 @@
 - 将 draft PR mark ready 后再触发：旧 PR 被合并 → 自动切出新分支 → 出现新 draft PR
 - draft 状态的 PR 永远不会被合并（合并步骤只挑非 draft 的）
 - 2026-10-15: 模拟一轮功能开发提交
+- 2026-10-15: 第二次开发提交（验证 auto-ready）
