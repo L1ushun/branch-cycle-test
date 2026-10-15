@@ -1,0 +1,66 @@
+name: cycle
+
+# 触发即一轮循环：合并当前所有 ready 的 PR 到主分支，然后从最新主分支切出新分支并建 draft PR
+# 如需固定周期兜底，可加：
+#   schedule:
+#     - cron: '10 10 * * 5'
+on:
+  workflow_dispatch:
+    inputs:
+      new_branch:
+        description: '新分支名（留空则用 dev-日期）'
+        required: false
+        default: ''
+  push:
+    branches: [master]
+    paths: ['TRIGGER_CYCLE']
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  merge-and-cut:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: master
+
+      - name: Merge ready PRs into master
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          prs=$(gh pr list --base master --json number,isDraft -q '.[] | select(.isDraft == false) | .number')
+          if [ -z "$prs" ]; then
+            echo "没有 ready 状态的 PR，跳过合并步骤"
+          else
+            for pr in $prs; do
+              echo ">>> 合并 PR #$pr"
+              gh pr merge "$pr" --merge --delete-branch || echo "!!! PR #$pr 合并失败，跳过"
+            done
+          fi
+
+      - name: Cut new branch & open draft PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NEW_BRANCH: ${{ inputs.new_branch }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout master
+          git pull origin master
+          BRANCH="${NEW_BRANCH:-dev-$(date +%Y%m%d)}"
+          # 同一天多次触发时避免分支重名
+          if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
+            BRANCH="${BRANCH}-$(date +%H%M%S)"
+          fi
+          echo ">>> 切出新分支 $BRANCH"
+          git checkout -b "$BRANCH"
+          git commit --allow-empty -m "chore: start cycle $BRANCH"
+          git push origin "$BRANCH"
+          gh pr create --base master --head "$BRANCH" \
+            --title "merge: $BRANCH" \
+            --body "自动创建的开发分支 PR。开发完成后 ready，下次触发 cycle 时合并。" \
+            --draft
+          echo ">>> 完成，下一轮触发时合并此 PR"
