@@ -55,10 +55,27 @@ jobs:
           gh label create wip --description "开发中，CI 全绿后由 auto-ready 自动移除" --color d73a4a 2>/dev/null || echo "wip 标签已存在"
           git checkout master
           git pull origin master
-          BRANCH="${NEW_BRANCH:-dev-$(date +%Y%m%d)}"
-          # 同一天多次触发时避免分支重名
+          # 版本自增：取「远程现存 release 分支」与「已合并 release PR 标题」中的最大版本，minor +1
+          # （合并会删旧分支，所以必须同时看已合并 PR 的标题，否则版本号会回退）
+          # 没有任何 release 记录时从 v1.17.0 起步
+          branch_max=$(git ls-remote --heads origin 'refs/heads/release/v*' \
+            | awk -F/ '{print $NF}' | sed 's/^v//' | sort -V | tail -1)
+          merged_max=$(gh pr list --state merged --base master --limit 50 --json title \
+            -q '.[].title' | grep -oE 'release/v[0-9]+\.[0-9]+\.[0-9]+' | sed 's|release/v||' | sort -V | tail -1)
+          last=$(printf '%s\n%s\n' "$branch_max" "$merged_max" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)
+          if [ -n "${NEW_BRANCH:-}" ]; then
+            BRANCH="$NEW_BRANCH"
+          elif [ -z "$last" ]; then
+            BRANCH="release/v1.17.0"
+          else
+            major=${last%%.*}
+            rest=${last#*.}
+            minor=${rest%%.*}
+            BRANCH="release/v$((major)).$((minor+1)).0"
+          fi
           if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
-            BRANCH="${BRANCH}-$(date +%H%M%S)"
+            echo "!!! 分支 $BRANCH 已存在，退出（可用 new_branch 输入参数手动指定）"
+            exit 1
           fi
           echo ">>> 切出新分支 $BRANCH"
           git checkout -b "$BRANCH"
