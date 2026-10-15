@@ -40,7 +40,7 @@ release/v1.17.0 → release/v1.18.0 → release/v1.19.0 → ...
 
 - 起点：仓库无任何 release 记录时从 `v1.17.0` 开始
 - 下一版 = 取「远程现存 release 分支」与「已合并 release PR 标题」两者的**最大版本**，minor +1
-  （合并时会删除旧分支，所以必须同时看已合并 PR 的标题，否则版本号会回退）
+- **release 分支合并后保留**，作版本归档（不使用 `--delete-branch`）
 - 需要特殊命名时，手动触发 cycle 填 `new_branch` 输入参数覆盖
 
 ## 状态语义：wip 标签

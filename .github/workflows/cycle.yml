@@ -40,7 +40,8 @@ jobs:
           else
             for pr in $prs; do
               echo ">>> 合并 PR #$pr"
-              gh pr merge "$pr" --merge --delete-branch || echo "!!! PR #$pr 合并失败，跳过"
+              # 不加 --delete-branch：release 分支保留作版本归档
+              gh pr merge "$pr" --merge || echo "!!! PR #$pr 合并失败，跳过"
             done
           fi
 
