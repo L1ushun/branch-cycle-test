@@ -22,3 +22,4 @@
 - 第一次触发：无 PR 可合并 → 切出 `dev-YYYYMMDD` 分支 → 出现 draft PR
 - 将 draft PR mark ready 后再触发：旧 PR 被合并 → 自动切出新分支 → 出现新 draft PR
 - draft 状态的 PR 永远不会被合并（合并步骤只挑非 draft 的）
+- 开发提交：验证 auto-ready 全链路
