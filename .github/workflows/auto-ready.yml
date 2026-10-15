@@ -19,6 +19,7 @@ jobs:
       - name: Ready draft PR if all checks passed
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
           prs=$(gh pr list --state open --json number,isDraft,headRefOid \
