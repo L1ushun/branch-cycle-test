@@ -51,7 +51,8 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          gh label create wip --description "开发中，CI 全绿后由 auto-ready 自动移除" --color d73a4a --if-not-exists || true
+          # runner 内置 gh 版本较旧，不支持 --if-not-exists，用 || 兜底实现幂等
+          gh label create wip --description "开发中，CI 全绿后由 auto-ready 自动移除" --color d73a4a 2>/dev/null || echo "wip 标签已存在"
           git checkout master
           git pull origin master
           BRANCH="${NEW_BRANCH:-dev-$(date +%Y%m%d)}"
