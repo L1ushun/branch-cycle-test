@@ -31,7 +31,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          prs=$(gh pr list --base master --json number,isDraft -q '.[] | select(.isDraft == false) | .number')
+          # 无 wip 标签的 PR 视为开发完成（GITHUB_TOKEN 无法操作 draft，改用 wip 标签表达"开发中"）
+          prs=$(gh pr list --base master --json number,labels \
+            -q '.[] | select(([.labels[].name] | index("wip")) | not) | .number')
           if [ -z "$prs" ]; then
             echo "没有 ready 状态的 PR，跳过合并步骤"
           else
@@ -41,13 +43,14 @@ jobs:
             done
           fi
 
-      - name: Cut new branch & open draft PR
+      - name: Cut new branch & open WIP PR
         env:
           GH_TOKEN: ${{ github.token }}
           NEW_BRANCH: ${{ inputs.new_branch }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          gh label create wip --description "开发中，CI 全绿后由 auto-ready 自动移除" --color d73a4a --if-not-exists || true
           git checkout master
           git pull origin master
           BRANCH="${NEW_BRANCH:-dev-$(date +%Y%m%d)}"
@@ -61,6 +64,6 @@ jobs:
           git push origin "$BRANCH"
           gh pr create --base master --head "$BRANCH" \
             --title "merge: $BRANCH" \
-            --body "自动创建的开发分支 PR。开发完成后 ready，下次触发 cycle 时合并。" \
-            --draft
-          echo ">>> 完成，下一轮触发时合并此 PR"
+            --body "自动创建的开发分支 PR。CI 全绿后 auto-ready 移除 wip 标签，下次触发 cycle 时合并。" \
+            --label wip
+          echo ">>> 完成，CI 全绿后自动 ready，下一轮触发时合并此 PR"

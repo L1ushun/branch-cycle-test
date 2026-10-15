@@ -1,6 +1,6 @@
 name: auto-ready
 
-# ci workflow 跑完且成功后：若该提交对应的 draft PR 所有 checks 都通过，自动转为 ready
+# ci workflow 跑完且成功后：若该提交对应的 wip PR 所有 checks 都通过，自动移除 wip 标签（等价转 ready）
 # （不用 check_suite 触发器，它有大量不触发的已知问题；workflow_run 是官方推荐的稳定写法）
 on:
   workflow_run:
@@ -10,6 +10,7 @@ on:
 permissions:
   contents: read
   pull-requests: write
+  issues: write
   actions: read
   checks: read
 
@@ -18,16 +19,17 @@ jobs:
     if: github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
-      - name: Ready draft PR if all checks passed
+      - name: Ready WIP PR if all checks passed
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
-          prs=$(gh pr list --state open --json number,isDraft,headRefOid \
-            --jq '.[] | select(.headRefOid == env.HEAD_SHA and .isDraft == true) | .number')
+          # wip 标签等价于 draft 状态（GITHUB_TOKEN 无权 markPullRequestReadyForReview，用标签绕过）
+          prs=$(gh pr list --state open --json number,labels,headRefOid \
+            --jq '.[] | select(.headRefOid == env.HEAD_SHA and ([.labels[].name] | index("wip")) != null) | .number')
           if [ -z "$prs" ]; then
-            echo ">>> 该提交没有对应的 draft PR，跳过"
+            echo ">>> 该提交没有带 wip 标签的 PR，跳过"
             exit 0
           fi
           for pr in $prs; do
@@ -36,8 +38,8 @@ jobs:
               --jq '[.[] | select(.name != "ready-if-green")
                      | select(.bucket != "pass" and .bucket != "skipping")] | length')
             if [ "$not_green" -eq 0 ]; then
-              echo ">>> PR #$pr 全部 checks 通过，自动转为 ready"
-              gh pr ready "$pr"
+              echo ">>> PR #$pr 全部 checks 通过，移除 wip 标签（等价转 ready）"
+              gh pr edit "$pr" --remove-label wip
             else
               echo ">>> PR #$pr 还有 $not_green 个未通过/进行中的 checks，暂不 ready"
             fi
