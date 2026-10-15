@@ -1,10 +1,10 @@
 name: ci
 
-# 模拟 CI：往 dev 分支推代码 / 更新 PR 时跑检查
+# 模拟 CI：往 release 分支推代码 / 更新 PR 时跑检查
 # 真实项目里换成你们已有的 lint / test / build workflow 即可
 on:
   push:
-    branches: ['dev-*']
+    branches: ['release/*']
   pull_request:
 
 jobs:

@@ -10,9 +10,9 @@ GitHub Actions 分支循环自动化：**从主分支切开发分支 → 开发 
             ┌──────────────────────────────────────────────────┐
             │                                                  │
             ▼                                                  │
-┌─── 触发 cycle ───┐                                           │
+┌─── 触发 cycle ────┐                                          │
 │ ① 合并所有 ready PR │ → master 前进一步                        │
-│ ② 切新 dev 分支    │ → 从最新 master 切出                      │
+│ ② 切新 release 分支 │ → 版本自增（v1.17.0 → v1.18.0）         │
 │ ③ 建 wip PR       │ → 红色 wip 标签 = 开发中                  │
 └──────────────────┘                                           │
             │                                                  │
@@ -26,9 +26,22 @@ GitHub Actions 分支循环自动化：**从主分支切开发分支 → 开发 
 
 | 文件 | 职责 | 触发方式 |
 |---|---|---|
-| `ci.yml` | 跑检查（当前是占位 echo，**换成你的 lint/test/build**） | push 到 `dev-*` 分支 / PR 更新 |
+| `ci.yml` | 跑检查（当前是占位 echo，**换成你的 lint/test/build**） | push 到 `release/*` 分支 / PR 更新 |
 | `auto-ready.yml` | CI 全绿 → 自动摘除 wip 标签（等价"转 ready"） | `ci` 运行完成 |
-| `cycle.yml` | 合并所有 ready PR + 从最新 master 切新分支 + 建新 wip PR | 手动 / 定时 / push `TRIGGER_CYCLE` / API |
+| `cycle.yml` | 合并所有 ready PR + 从最新 master 切新版本分支 + 建新 wip PR | 手动 / 定时 / push `TRIGGER_CYCLE` / API |
+
+## 分支命名与版本自增
+
+分支结构为 `release/vX.Y.0`，每轮**次版本号 +1**（patch 恒为 0）：
+
+```
+release/v1.17.0 → release/v1.18.0 → release/v1.19.0 → ...
+```
+
+- 起点：仓库无任何 release 记录时从 `v1.17.0` 开始
+- 下一版 = 取「远程现存 release 分支」与「已合并 release PR 标题」两者的**最大版本**，minor +1
+  （合并时会删除旧分支，所以必须同时看已合并 PR 的标题，否则版本号会回退）
+- 需要特殊命名时，手动触发 cycle 填 `new_branch` 输入参数覆盖
 
 ## 状态语义：wip 标签
 
@@ -44,7 +57,7 @@ GitHub Actions 分支循环自动化：**从主分支切开发分支 → 开发 
 ### 开发者：只管 push
 
 ```bash
-git push origin dev-20261015
+git push origin release/v1.18.0
 ```
 
 push 后自动走：CI 检查 → 全绿 → 摘 wip → 进入待合并状态。CI 失败则保持 wip，修好再 push，不用担心半成品被合并。
@@ -91,8 +104,8 @@ gh workflow run cycle.yml --repo L1ushun/branch-cycle-test
 - **Q：auto-ready 为什么有时跑两次？**
   A：同一次 push 产生 push + pull_request 双事件，各发一次 `workflow_run`。逻辑幂等，无害。
 
-- **Q：同一天多次触发，分支会重名吗？**
-  A：不会，检测到重名自动追加 `-HHMMSS` 时间戳；且合并时 `--delete-branch` 会先清掉旧分支，多数情况原名可复用。
+- **Q：版本号会不会回退或重名？**
+  A：不会。下一版取「现存分支」与「已合并 PR 标题」的最大版本 +1；万一新算出的分支名已存在，workflow 直接报错退出（可用 `new_branch` 参数手动指定），不会静默覆盖。
 
 - **Q：`gh pr checks` 报 `Resource not accessible by integration`？**
   A：workflow 的 `permissions` 需要 `actions: read` + `checks: read`（读 checks 汇总）。
